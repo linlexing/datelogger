@@ -11,13 +11,14 @@ import (
 
 type DateLogger struct {
 	Path        string //存放的目录名
+	Level       logrus.Level
 	log         *logrus.Logger
 	logFile     *os.File
 	logFileName string //当前的日志文件名
 }
 
 func NewDateLog(pathName string) *DateLogger {
-	return &DateLogger{Path: pathName}
+	return &DateLogger{Path: pathName, Level: logrus.DebugLevel}
 }
 
 func (d *DateLogger) checkLogFile() error {
@@ -33,7 +34,7 @@ func (d *DateLogger) checkLogFile() error {
 					TimestampFormat: "20060102T150405",
 				},
 				Hooks: make(logrus.LevelHooks),
-				Level: logrus.DebugLevel,
+				Level: d.Level,
 			}
 		}
 		d.logFileName = strPath
