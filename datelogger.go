@@ -10,17 +10,21 @@ import (
 )
 
 type DateLogger struct {
-	Path        string //存放的目录名
-	Level       logrus.Level
-	log         *logrus.Logger
-	logFile     *os.File
-	logFileName string //当前的日志文件名
+	Path         string //存放的目录名
+	Level        logrus.Level
+	log          *logrus.Logger
+	reportCaller bool
+	logFile      *os.File
+	logFileName  string //当前的日志文件名
 }
 
 func NewDateLog(pathName string) *DateLogger {
 	return &DateLogger{Path: pathName, Level: logrus.DebugLevel}
 }
-
+func (d *DateLogger) SetReportCaller(val bool) {
+	d.reportCaller = val
+	d.log.SetReportCaller(val)
+}
 func (d *DateLogger) checkLogFile() error {
 	strPath := filepath.Join(d.Path, time.Now().Format("2006-01-02")+".txt")
 	if strPath != d.logFileName {
@@ -33,8 +37,9 @@ func (d *DateLogger) checkLogFile() error {
 				Formatter: &logrus.TextFormatter{
 					TimestampFormat: "20060102T150405",
 				},
-				Hooks: make(logrus.LevelHooks),
-				Level: d.Level,
+				Hooks:        make(logrus.LevelHooks),
+				Level:        d.Level,
+				ReportCaller: d.reportCaller,
 			}
 		}
 		d.logFileName = strPath
