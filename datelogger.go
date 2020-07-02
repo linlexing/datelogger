@@ -1,4 +1,4 @@
-package datelogger /*一个按日期存放的日志系统*/
+package datelogger
 
 import (
 	"io"
@@ -9,37 +9,61 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+//DateLogger 自动按照日期分文件写入日志
 type DateLogger struct {
-	Path         string //存放的目录名
-	Level        logrus.Level
-	log          *logrus.Logger
-	reportCaller bool
-	logFile      *os.File
-	logFileName  string //当前的日志文件名
+	path        string //存放的目录名
+	logFile     *os.File
+	logFileName string //当前的日志文件名
+	log         *logrus.Logger
 }
 
-func NewDateLog(pathName string) *DateLogger {
-	return &DateLogger{Path: pathName, Level: logrus.DebugLevel}
+//NewDateLogger 分配一个按日期存放 文件的日志
+func NewDateLogger(strPath string) *DateLogger {
+	d := &DateLogger{
+		path: strPath,
+	}
+	l := &logrus.Logger{
+		Formatter: &logrus.TextFormatter{
+			TimestampFormat: "20060102T150405",
+		},
+		Hooks: make(logrus.LevelHooks),
+		Out:   io.MultiWriter(d, os.Stdout),
+		Level: logrus.DebugLevel,
+	}
+	d.log = l
+	return d
 }
-func (d *DateLogger) SetReportCaller(val bool) {
-	d.reportCaller = val
-	d.log.SetReportCaller(val)
+
+//Log 返回实际的logrus
+func (d *DateLogger) Log() *logrus.Logger {
+	return d.log
+}
+
+//Close 关闭底层文件
+func (d *DateLogger) Close() error {
+	if d.logFile != nil {
+		err := d.logFile.Close()
+		d.log = nil
+		d.logFile = nil
+		return err
+	} else {
+		return nil
+	}
+}
+
+//Write 被logrus 调用来写日志，自动分文件
+func (d *DateLogger) Write(p []byte) (n int, err error) {
+	if err := d.checkLogFile(); err != nil {
+		return -1, err
+	}
+	return d.logFile.Write(p)
 }
 func (d *DateLogger) checkLogFile() error {
-	strPath := filepath.Join(d.Path, time.Now().Format("2006-01-02")+".txt")
+	strPath := filepath.Join(d.path, time.Now().Format("2006-01-02")+".txt")
 	if strPath != d.logFileName {
 		if d.logFile != nil {
 			if err := d.logFile.Close(); err != nil {
 				return err
-			}
-		} else {
-			d.log = &logrus.Logger{
-				Formatter: &logrus.TextFormatter{
-					TimestampFormat: "20060102T150405",
-				},
-				Hooks:        make(logrus.LevelHooks),
-				Level:        d.Level,
-				ReportCaller: d.reportCaller,
 			}
 		}
 		d.logFileName = strPath
@@ -52,243 +76,6 @@ func (d *DateLogger) checkLogFile() error {
 			return err
 		}
 		d.logFile = flog
-		d.log.Out = io.MultiWriter(flog, os.Stdout)
 	}
 	return nil
-}
-
-// WithError creates an entry from the standard logger and adds an error to it, using the value defined in ErrorKey as key.
-func (d *DateLogger) WithError(err error) *logrus.Entry {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	return d.log.WithError(err)
-}
-
-// WithField creates an entry from the standard logger and adds a field to
-// it. If you want multiple fields, use `WithFields`.
-//
-// Note that it doesn't log until you call Debug, Print, Info, Warn, Fatal
-// or Panic on the Entry it returns.
-func (d *DateLogger) WithField(key string, value interface{}) *logrus.Entry {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	return d.log.WithField(key, value)
-}
-
-// WithFields creates an entry from the standard logger and adds multiple
-// fields to it. This is simply a helper for `WithField`, invoking it
-// once for each field.
-//
-// Note that it doesn't log until you call Debug, Print, Info, Warn, Fatal
-// or Panic on the Entry it returns.
-func (d *DateLogger) WithFields(fields logrus.Fields) *logrus.Entry {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	return d.log.WithFields(fields)
-}
-
-// Debug logs a message at level Debug on the standard logger.
-func (d *DateLogger) Debug(args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Debug(args...)
-}
-
-// Print logs a message at level Info on the standard logger.
-func (d *DateLogger) Print(args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Print(args...)
-
-}
-
-// Info logs a message at level Info on the standard logger.
-func (d *DateLogger) Info(args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Info(args...)
-}
-
-// Warn logs a message at level Warn on the standard logger.
-func (d *DateLogger) Warn(args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Warn(args...)
-}
-
-// Warning logs a message at level Warn on the standard logger.
-func (d *DateLogger) Warning(args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Warning(args...)
-}
-
-// Error logs a message at level Error on the standard logger.
-func (d *DateLogger) Error(args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Error(args...)
-}
-
-// Panic logs a message at level Panic on the standard logger.
-func (d *DateLogger) Panic(args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Panic(args...)
-}
-
-// Fatal logs a message at level Fatal on the standard logger.
-func (d *DateLogger) Fatal(args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Fatal(args...)
-}
-
-// Debugf logs a message at level Debug on the standard logger.
-func (d *DateLogger) Debugf(format string, args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Debugf(format, args...)
-}
-
-// Printf logs a message at level Info on the standard logger.
-func (d *DateLogger) Printf(format string, args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Printf(format, args...)
-}
-
-// Infof logs a message at level Info on the standard logger.
-func (d *DateLogger) Infof(format string, args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Infof(format, args...)
-}
-
-// Warnf logs a message at level Warn on the standard logger.
-func (d *DateLogger) Warnf(format string, args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Warnf(format, args...)
-}
-
-// Warningf logs a message at level Warn on the standard logger.
-func (d *DateLogger) Warningf(format string, args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Warningf(format, args...)
-}
-
-// Errorf logs a message at level Error on the standard logger.
-func (d *DateLogger) Errorf(format string, args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Errorf(format, args...)
-}
-
-// Panicf logs a message at level Panic on the standard logger.
-func (d *DateLogger) Panicf(format string, args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Panicf(format, args...)
-}
-
-// Fatalf logs a message at level Fatal on the standard logger.
-func (d *DateLogger) Fatalf(format string, args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Fatalf(format, args...)
-}
-
-// Debugln logs a message at level Debug on the standard logger.
-func (d *DateLogger) Debugln(args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Debugln(args...)
-}
-
-// Println logs a message at level Info on the standard logger.
-func (d *DateLogger) Println(args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Println(args...)
-}
-
-// Infoln logs a message at level Info on the standard logger.
-func (d *DateLogger) Infoln(args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Infoln(args...)
-}
-
-// Warnln logs a message at level Warn on the standard logger.
-func (d *DateLogger) Warnln(args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Warnln(args...)
-}
-
-// Warningln logs a message at level Warn on the standard logger.
-func (d *DateLogger) Warningln(args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Warningln(args...)
-}
-
-// Errorln logs a message at level Error on the standard logger.
-func (d *DateLogger) Errorln(args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Errorln(args...)
-}
-
-// Panicln logs a message at level Panic on the standard logger.
-func (d *DateLogger) Panicln(args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Panicln(args...)
-}
-
-// Fatalln logs a message at level Fatal on the standard logger.
-func (d *DateLogger) Fatalln(args ...interface{}) {
-	if err1 := d.checkLogFile(); err1 != nil {
-		logrus.Panic(err1)
-	}
-	d.log.Fatalln(args...)
-}
-func (d *DateLogger) Close() error {
-	if d.logFile != nil {
-		err := d.logFile.Close()
-		d.log = nil
-		d.logFile = nil
-		return err
-	} else {
-		return nil
-	}
 }
